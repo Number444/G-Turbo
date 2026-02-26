@@ -178,6 +178,24 @@ class MainActivity : AppCompatActivity() {
         return caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
     }
 
+    override fun onResume() {
+        super.onResume()
+        // 1. 通知 WebView 恢复活跃状态（恢复 JS 调度和渲染）
+        webView.onResume()
+        
+        // 2. 强制触发一次重绘
+        // 延迟 50ms 确保 Window 焦点已回归，彻底解决黑屏挂起问题
+        webView.postDelayed({
+            webView.invalidate()
+        }, 50)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // 当你息屏或切到后台时，暂停内核处理，防止后台耗电
+        webView.onPause()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         connectivityManager.unregisterNetworkCallback(networkCallback)
