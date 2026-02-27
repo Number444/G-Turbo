@@ -18,6 +18,7 @@ import android.webkit.*
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.enableEdgeToEdge
@@ -35,6 +36,7 @@ import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var loadingSpinner: android.widget.ProgressBar
     private lateinit var webView: WebView
     private lateinit var errorLayout: LinearLayout
     private lateinit var btnRetry: Button
@@ -69,7 +71,7 @@ class MainActivity : AppCompatActivity() {
                                 if (editor) {
                                     editor.focus();
                                     
-                                    // 模拟创建一个 DataTransfer 对象，这是最接近原生上传的注入方式
+                                    // 模拟创建一个 DataTransfer 对象
                                     const b64Data = "$base64Image";
                                     const byteCharacters = atob(b64Data);
                                     const byteArrays = [];
@@ -92,7 +94,7 @@ class MainActivity : AppCompatActivity() {
 
                                     // 延迟输入文字
                                     setTimeout(() => {
-                                        document.execCommand('insertText', false, '请根据拍摄的这张最新的照片解题');
+                                        document.execCommand('insertText', false, '请根据这张最新的照片解题');
                                     }, 1000);
                                 }
                             })();
@@ -133,11 +135,38 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread { showError() }
         }
     }
+    // 🎨 核心：精准控制 Gemini 风格配色
+    private fun applyThemeColors(isDarkMode: Boolean) {
+        // 定义色值（根据 Gemini 网页风格微调）
+        val bgColor = Color.parseColor(if (isDarkMode) "#131314" else "#FFFFFF")
+        val textColor = Color.parseColor(if (isDarkMode) "#E3E3E3" else "#1F1F1F")
+        // 按钮：晚上深灰，白天极浅灰
+        val btnBgColor = Color.parseColor(if (isDarkMode) "#303134" else "#F1F3F4")
+
+        // 1. 强制覆盖背景（解决断网黑/白屏）
+        findViewById<FrameLayout>(R.id.main_container).setBackgroundColor(bgColor)
+        errorLayout.setBackgroundColor(bgColor)
+        accessoryBar.setBackgroundColor(bgColor)
+
+        // 2. 刷新文字颜色
+        findViewById<TextView>(R.id.tv_error_msg).setTextColor(textColor)
+        btnRetry.setTextColor(textColor)
+        btnRetry.backgroundTintList = android.content.res.ColorStateList.valueOf(btnBgColor)
+
+        // 3. 刷新拍题按钮样式（纯色、无阴影）
+        btnTakePhoto.setTextColor(textColor)
+        btnTakePhoto.backgroundTintList = android.content.res.ColorStateList.valueOf(btnBgColor)
+
+        // 4. 彻底解决顶栏图标锁死（黑白反转）
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.isAppearanceLightStatusBars = !isDarkMode
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         // 开启全屏沉浸
         enableEdgeToEdge()
+        setContentView(R.layout.activity_main)
         super.onCreate(savedInstanceState)
 
         splashScreen.setKeepOnScreenCondition { keepSplash }
@@ -150,22 +179,18 @@ class MainActivity : AppCompatActivity() {
             requestMicPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
 
-
-
-// 2. 动态调整状态栏图标颜色
-        val controller = WindowCompat.getInsetsController(window, window.decorView)
-        val isDarkMode = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-
-// 如果是白天模式，图标设为黑色；深色模式下，图标自动变白
-        controller.isAppearanceLightStatusBars = !isDarkMode
-
         val mainContainer = findViewById<FrameLayout>(R.id.main_container)
+        loadingSpinner = findViewById(R.id.loading_spinner)
         webView = findViewById(R.id.gemini_webview)
         errorLayout = findViewById(R.id.error_layout)
         btnRetry = findViewById(R.id.btn_retry)
         accessoryBar = findViewById(R.id.accessory_bar)
         btnTakePhoto = findViewById(R.id.btn_take_photo)
         connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        // 【关键点】首次启动时根据系统状态强制着色
+        val isDarkMode = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        applyThemeColors(isDarkMode)
 
         // 键盘与避让逻辑：通过物理缩减 WebView 边界，彻底解决挡住输入框问题
         ViewCompat.setOnApplyWindowInsetsListener(mainContainer) { _, insets ->
@@ -200,8 +225,10 @@ class MainActivity : AppCompatActivity() {
 
         // 绑定重试按钮
         btnRetry.setOnClickListener {
-            showWebView()
+            errorLayout.isVisible = false
+            loadingSpinner.isVisible = true // 显示圆环
             if (webView.url.isNullOrEmpty()) webView.loadUrl(targetUrl) else webView.reload()
+            webView.isVisible = true
         }
 
         // 绑定拍照按钮
@@ -240,11 +267,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupWebView() {
+        webView.setBackgroundColor(Color.TRANSPARENT)
         val settings = webView.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
 
         webView.webChromeClient = object : WebChromeClient() {
+
             // 麦克风权限核心申请逻辑
             override fun onPermissionRequest(request: PermissionRequest) {
                 // 在 8G3 这种高性能设备上，建议在 UI 线程处理
@@ -273,16 +302,24 @@ class MainActivity : AppCompatActivity() {
         }
 
         webView.webViewClient = object : WebViewClient() {
+            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                loadingSpinner.isVisible = true // 开始加载，必定显示转圈
+                errorLayout.isVisible = false   // 隐藏错误面板
+            }
             override fun onPageFinished(view: WebView?, url: String?) {
-                isSuccessfullyLoaded = true
-                webView.evaluateJavascript("""
-                    (function() { 
-                        var h = document.querySelector('header'); if(h) h.style.display='none'; 
-                        var style = document.createElement('style');
-                        style.innerHTML = '* { -webkit-tap-highlight-color: transparent !important; outline: none !important; }';
-                        document.head.appendChild(style);
-                    })();
-                """.trimIndent(), null)
+                // 只有当没有显示错误面板时，才隐藏转圈（代表加载成功）
+                if (!errorLayout.isVisible) {
+                    loadingSpinner.isVisible = false
+                    webView.evaluateJavascript("""
+                        (function() { 
+                            var h = document.querySelector('header'); if(h) h.style.display='none'; 
+                            var style = document.createElement('style');
+                            style.innerHTML = '* { -webkit-tap-highlight-color: transparent !important; outline: none !important; }';
+                            document.head.appendChild(style);
+                        })();
+                    """.trimIndent(), null)
+                }
             }
 
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
@@ -298,8 +335,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun showError() {
         runOnUiThread {
-            webView.isVisible = false
-            errorLayout.isVisible = true
+            loadingSpinner.isVisible = false // 断网报错，立刻停止转圈
+            webView.isVisible = false        // 彻底隐藏 WebView，防止点出白色错误页
+            errorLayout.isVisible = true     // 弹出重试面板
         }
     }
 
@@ -326,5 +364,16 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         connectivityManager.unregisterNetworkCallback(networkCallback)
+    }
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // 重新调用沉浸式初始化
+        enableEdgeToEdge()
+
+        // 从 newConfig 获取最新的模式
+        val isDarkMode = (newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+
+        // 传入 applyThemeColors 处理
+        applyThemeColors(isDarkMode)
     }
 }
