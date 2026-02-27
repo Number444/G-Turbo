@@ -3,34 +3,57 @@
     android:id="@+id/main_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#131314">
+    android:background="?android:attr/windowBackground"> <WebView
+    android:id="@+id/gemini_webview"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?android:attr/windowBackground" /> <LinearLayout
+    android:id="@+id/error_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?android:attr/windowBackground"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:visibility="gone">
 
-    <WebView
-        android:id="@+id/gemini_webview"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="网络连接似乎断开了"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="18sp" />
+
+    <Button
+        android:id="@+id/btn_retry"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="重新连接" />
+</LinearLayout>
 
     <LinearLayout
-        android:id="@+id/error_layout"
+        android:id="@+id/accessory_bar"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#131314"
-        android:gravity="center"
-        android:orientation="vertical"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="?android:attr/colorBackgroundFloating"
+        android:elevation="8dp"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="6dp"
         android:visibility="gone">
 
-        <TextView
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_take_photo"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="网络连接似乎断开了"
+            android:backgroundTint="#1a73e8"
+            android:text="📸 拍题解题"
             android:textColor="#FFFFFF"
-            android:textSize="18sp" />
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
-        <Button
-            android:id="@+id/btn_retry"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="重新连接" />
     </LinearLayout>
+
 </FrameLayout>
