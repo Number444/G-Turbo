@@ -119,6 +119,14 @@ class MainActivity : AppCompatActivity() {
         fileChooserCallback = null
     }
 
+    private val requestMicPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (isGranted) {
+            Toast.makeText(this, "麦克风已就绪", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "需要录音权限才能使用语音功能", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onLost(network: Network) {
             super.onLost(network)
@@ -137,9 +145,12 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
 
-        // 1. 强制设置沉浸式状态栏透明
-        window.statusBarColor = Color.TRANSPARENT
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        // 在需要的时候调用（比如检测到网页报错或初始化时）
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestMicPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+
+
 
 // 2. 动态调整状态栏图标颜色
         val controller = WindowCompat.getInsetsController(window, window.decorView)
@@ -234,6 +245,20 @@ class MainActivity : AppCompatActivity() {
         settings.domStorageEnabled = true
 
         webView.webChromeClient = object : WebChromeClient() {
+            // 麦克风权限核心申请逻辑
+            override fun onPermissionRequest(request: PermissionRequest) {
+                // 在 8G3 这种高性能设备上，建议在 UI 线程处理
+                runOnUiThread {
+                    val resources = request.resources
+                    for (res in resources) {
+                        if (res == PermissionRequest.RESOURCE_AUDIO_CAPTURE) {
+                            // 授权网页访问麦克风
+                            request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+                            return@runOnUiThread
+                        }
+                    }
+                }
+            }
             override fun onShowFileChooser(view: WebView?, fp: ValueCallback<Array<Uri>>?, fcp: FileChooserParams?): Boolean {
                 // 正常的选择文件请求（点击网页原生按钮时触发）
                 fileChooserCallback = fp
