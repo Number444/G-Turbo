@@ -1,7 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:drawable="@mipmap/ic_launcher_foreground"
-    android:insetLeft="33%"
-    android:insetRight="33%"
-    android:insetTop="25%"
-    android:insetBottom="41%" />
+    android:drawable="@drawable/ic_splash_logo"
+    android:inset="60dp" />
