@@ -50,7 +50,6 @@ class MainActivity : AppCompatActivity() {
 
     // 自动上传核心：记录当前拍摄的高清图路径
     private var currentPhotoUri: Uri? = null
-    private var pendingUploadUri: Uri? = null
 
     // 1. 拍照完成后的逻辑：存入剪贴板 -> 模拟粘贴动作 -> 填入文字
     private val takePictureLauncher = registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
@@ -233,20 +232,9 @@ class MainActivity : AppCompatActivity() {
         val settings = webView.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
-        //核心增加部分：允许 JS 模拟用户交互和弹窗
-        settings.javaScriptCanOpenWindowsAutomatically = true
-        settings.setSupportMultipleWindows(false)
-        settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onShowFileChooser(view: WebView?, fp: ValueCallback<Array<Uri>>?, fcp: FileChooserParams?): Boolean {
-                // 关键：如果 execCommand('paste') 触发了网页的文件选择请求，这里直接喂入图片
-                if (pendingUploadUri != null) {
-                    fp?.onReceiveValue(arrayOf(pendingUploadUri!!))
-                    pendingUploadUri = null
-                    return true
-                }
-
                 // 正常的选择文件请求（点击网页原生按钮时触发）
                 fileChooserCallback = fp
                 val isImageOnly = fcp?.acceptTypes?.any { it.contains("image") } == true
