@@ -11,7 +11,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.myapplication1"
+        applicationId = "com.gemini.turbo.assistant"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -21,12 +21,15 @@ android {
     }
 
     buildTypes {
-        release {
+        getByName("debug") {
+            // 调试版包名后缀，安装后包名为 com.example.myapplication1.debug
+            applicationIdSuffix = ".debug"
+        }
+
+        getByName("release") {
             isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            // 正式版保持原样 com.example.myapplication1
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
     compileOptions {
