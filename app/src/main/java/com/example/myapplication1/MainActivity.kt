@@ -36,6 +36,7 @@ import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
+
     private lateinit var loadingSpinner: android.widget.ProgressBar
     private lateinit var webView: WebView
     private lateinit var errorLayout: LinearLayout
@@ -52,26 +53,26 @@ class MainActivity : AppCompatActivity() {
 
     // 自动上传核心：记录当前拍摄的高清图路径
     private var currentPhotoUri: Uri? = null
+    private var shouldInsertText = true
 
     // 1. 拍照完成后的逻辑：存入剪贴板 -> 模拟粘贴动作 -> 填入文字
     private val takePictureLauncher = registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         if (success && currentPhotoUri != null) {
-            // 1. 在后台读取图片并转换为 Base64
             Thread {
                 try {
                     val inputStream = contentResolver.openInputStream(currentPhotoUri!!)
                     val bytes = inputStream?.readBytes()
                     val base64Image = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
 
-                    // 2. 切回主线程注入 JS
                     runOnUiThread {
+                        // 构建提示词：使用了你要求的精准解题提示词
+                        val proPrompt = """你现在是一名资深的学术导师。请精准识别我刚刚上传的这张最新图片（这是当前的解题目标）。请先扫描图片中的题目内容，然后按照以下逻辑进行：\n1. 【题目还原】：简要描述图片中的关键信息；\n2. 【核心思路】：说明解题所涉及的定理或公式；\n3. 【详细步骤】：给出清晰的推导或计算过程；\n4. 【最终答案】：加粗显示结论。"""
+
                         val injectJs = """
                             (function() {
                                 const editor = document.querySelector('div[contenteditable="true"]') || document.querySelector('textarea');
                                 if (editor) {
                                     editor.focus();
-                                    
-                                    // 模拟创建一个 DataTransfer 对象
                                     const b64Data = "$base64Image";
                                     const byteCharacters = atob(b64Data);
                                     const byteArrays = [];
@@ -81,7 +82,6 @@ class MainActivity : AppCompatActivity() {
                                     const blob = new Blob([new Uint8Array(byteArrays)], {type: 'image/jpeg'});
                                     const file = new File([blob], "upload.jpg", {type: 'image/jpeg'});
                                     
-                                    // 构造粘贴事件
                                     const dataTransfer = new DataTransfer();
                                     dataTransfer.items.add(file);
                                     const pasteEvent = new ClipboardEvent('paste', {
@@ -89,20 +89,21 @@ class MainActivity : AppCompatActivity() {
                                         bubbles: true,
                                         cancelable: true
                                     });
-                                    
                                     editor.dispatchEvent(pasteEvent);
 
-                                    // 延迟输入文字
-                                    setTimeout(() => {
-                                        document.execCommand('insertText', false, '请根据这张最新的照片解题');
-                                    }, 1000);
+                                    // 根据标志位判断是否输入文本
+                                    if (${shouldInsertText}) {
+                                        setTimeout(() => {
+                                            document.execCommand('insertText', false, '$proPrompt');
+                                        }, 1000);
+                                    }
                                 }
                             })();
                         """.trimIndent()
                         webView.evaluateJavascript(injectJs, null)
                     }
                 } catch (e: Exception) {
-                    Log.e("G-Turbo", "Base64转换失败: ${e.message}")
+                    Log.e("G-Turbo", "操作失败: ${e.message}")
                 }
             }.start()
         }
@@ -135,29 +136,32 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread { showError() }
         }
     }
-    // 🎨 核心：精准控制 Gemini 风格配色
+    // 精准控制 Gemini 风格配色
     private fun applyThemeColors(isDarkMode: Boolean) {
-        // 定义色值（根据 Gemini 网页风格微调）
-        val bgColor = Color.parseColor(if (isDarkMode) "#131314" else "#FFFFFF")
+        // 定义 Gemini 风格配色
+        val bgColor = Color.parseColor(if (isDarkMode) "#131314" else "#FFFFFF") // 深灰黑或纯白
         val textColor = Color.parseColor(if (isDarkMode) "#E3E3E3" else "#1F1F1F")
-        // 按钮：晚上深灰，白天极浅灰
+        // 按钮色：晚上深灰，白天极浅灰
         val btnBgColor = Color.parseColor(if (isDarkMode) "#303134" else "#F1F3F4")
 
-        // 1. 强制覆盖背景（解决断网黑/白屏）
+        // 1. 强制覆盖底色（解决断网黑/白屏）
         findViewById<FrameLayout>(R.id.main_container).setBackgroundColor(bgColor)
         errorLayout.setBackgroundColor(bgColor)
         accessoryBar.setBackgroundColor(bgColor)
 
-        // 2. 刷新文字颜色
-        findViewById<TextView>(R.id.tv_error_msg).setTextColor(textColor)
+        // 2. 覆盖重试按钮
         btnRetry.setTextColor(textColor)
         btnRetry.backgroundTintList = android.content.res.ColorStateList.valueOf(btnBgColor)
 
-        // 3. 刷新拍题按钮样式（纯色、无阴影）
+        // 3. 【同步】刷新新按钮和原按钮：靠左、椭圆纯色、无阴影
+        val btnTakePhotoOnly = findViewById<Button>(R.id.btn_take_photo_only)
+        btnTakePhotoOnly.setTextColor(textColor)
+        btnTakePhotoOnly.backgroundTintList = android.content.res.ColorStateList.valueOf(btnBgColor)
+
         btnTakePhoto.setTextColor(textColor)
         btnTakePhoto.backgroundTintList = android.content.res.ColorStateList.valueOf(btnBgColor)
 
-        // 4. 彻底解决顶栏图标锁死（黑白反转）
+        // 4. 【关键】强制刷新状态栏图标颜色
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.isAppearanceLightStatusBars = !isDarkMode
     }
@@ -188,9 +192,23 @@ class MainActivity : AppCompatActivity() {
         btnTakePhoto = findViewById(R.id.btn_take_photo)
         connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
+        val btnTakePhotoOnly = findViewById<Button>(R.id.btn_take_photo_only)
+
         // 【关键点】首次启动时根据系统状态强制着色
         val isDarkMode = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         applyThemeColors(isDarkMode)
+
+        // 核心修改：加载前先判断网络，不给 WebView 等待 30s 的机会
+        if (savedInstanceState != null) {
+            webView.restoreState(savedInstanceState)
+        } else {
+            if (isNetworkAvailable()) {
+                loadingSpinner.isVisible = true // 只有有网才让 WebView 去跑
+                webView.loadUrl(targetUrl)
+            } else {
+                showError() // 没网立刻显示重连，不等待
+            }
+        }
 
         // 键盘与避让逻辑：通过物理缩减 WebView 边界，彻底解决挡住输入框问题
         ViewCompat.setOnApplyWindowInsetsListener(mainContainer) { _, insets ->
@@ -231,8 +249,18 @@ class MainActivity : AppCompatActivity() {
             webView.isVisible = true
         }
 
-        // 绑定拍照按钮
+        // 绑定拍题按钮
         btnTakePhoto.setOnClickListener {
+            shouldInsertText = true // 设置为 需要 插入文字
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                launchCamera()
+            } else {
+                requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
+        // 拍照上传
+        btnTakePhotoOnly.setOnClickListener {
+            shouldInsertText = false // 设置为 不需要 插入文字
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                 launchCamera()
             } else {
@@ -304,8 +332,10 @@ class MainActivity : AppCompatActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                loadingSpinner.isVisible = true // 开始加载，必定显示转圈
-                errorLayout.isVisible = false   // 隐藏错误面板
+                // 只要开始跑，圆环必须转
+                if (!errorLayout.isVisible) {
+                    loadingSpinner.isVisible = true
+                }
             }
             override fun onPageFinished(view: WebView?, url: String?) {
                 // 只有当没有显示错误面板时，才隐藏转圈（代表加载成功）
@@ -338,6 +368,9 @@ class MainActivity : AppCompatActivity() {
             loadingSpinner.isVisible = false // 断网报错，立刻停止转圈
             webView.isVisible = false        // 彻底隐藏 WebView，防止点出白色错误页
             errorLayout.isVisible = true     // 弹出重试面板
+            // 在显示错误页的一瞬间，再次强制刷一遍当前主题的颜色
+            val isDarkMode = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+            applyThemeColors(isDarkMode)
         }
     }
 

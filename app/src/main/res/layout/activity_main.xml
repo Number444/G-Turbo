@@ -57,14 +57,28 @@
         android:visibility="gone">
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_take_photo"
+            android:id="@+id/btn_take_photo_only"
             style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
             android:layout_width="wrap_content"
             android:layout_height="48dp"
             app:cornerRadius="24dp"
             app:elevation="0dp"
-            android:text="✏️ 拍题解题"
-            android:textColor="#FFFFFF"
+            android:text="📷 拍照上传"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:paddingHorizontal="20dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_take_photo"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            app:cornerRadius="24dp"
+            app:elevation="0dp"
+            android:text="✏️ 题目答疑"
             android:textSize="15sp"
             android:textStyle="bold"
             android:paddingHorizontal="20dp"
